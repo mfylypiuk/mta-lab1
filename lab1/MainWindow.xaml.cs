@@ -19,6 +19,12 @@ using System.Windows.Threading;
 
 namespace lab1
 {
+    enum PlayerType
+    {
+        Audio,
+        Video
+    }
+
     enum PlayerStatus
     {
         None,
@@ -32,63 +38,65 @@ namespace lab1
     /// </summary>
     public partial class MainWindow : Window
     {
-        private ObservableCollection<string> songs;
+        private ObservableCollection<string> files;
         private MediaPlayer mediaPlayer;
-        private int currentSongIndex;
-        private int selectedSongIndex;
+        private VideoPlayer videoPlayer;
+        private int currentFileIndex;
+        private int selectedFileIndex;
         private PlayerStatus playerStatus;
-        private DispatcherTimer timerAudioPlayback;
+        private PlayerType playerType;
+        private DispatcherTimer timerPlayback;
 
-        public ObservableCollection<string> Songs
+        public ObservableCollection<string> Files
         {
             get
             {
-                if (songs == null)
+                if (files == null)
                 {
-                    songs = LoadSongs();
+                    files = LoadFiles();
                 }
 
-                return songs;
+                return files;
             }
         }
 
         public MainWindow()
         {
             InitializeComponent();
-            SongsListBox.ItemsSource = Songs;
+            SongsListBox.ItemsSource = Files;
             playerStatus = PlayerStatus.None;
+            StartPauseButton.IsEnabled = false;
             AudioSlider.AddHandler(MouseLeftButtonUpEvent, new MouseButtonEventHandler(AudioSlider_MouseLeftButtonUp), true);
         }
 
-        private ObservableCollection<string> LoadSongs()
+        private ObservableCollection<string> LoadFiles()
         {
-            ObservableCollection<string> _songs = new ObservableCollection<string>();
-            string path = "music";
-            string[] files = Directory.GetFiles(path, "*.mp3");
+            ObservableCollection<string> _files = new ObservableCollection<string>();
+            string path = "files";
+            string[] files = Directory.GetFiles(path, "*.*").Where(file => file.EndsWith(".mp3") || file.EndsWith(".mp4")).ToArray();
 
             for (int i = 0; i < files.Length; i++)
             {
                 files[i] = files[i].Replace(path + "\\", string.Empty);
-                files[i] = files[i].Replace(".mp3", string.Empty);
             }
 
             foreach (var item in files)
             {
-                _songs.Add(item);
+                _files.Add(item);
             }
 
-            return _songs;
+            return _files;
         }
 
         private void Button_Click_4(object sender, RoutedEventArgs e)
         {
-            if (currentSongIndex - 1 < 0)
+            if (currentFileIndex - 1 < 0)
             {
-                Play(songs.Count - 1);
+                Play(files.Count - 1);
             }
             else
             {
-                Play(currentSongIndex - 1);
+                Play(currentFileIndex - 1);
             }
         }
 
@@ -101,7 +109,15 @@ namespace lab1
 
             if (playerStatus == PlayerStatus.Paused)
             {
-                mediaPlayer.Play();
+                if (playerType == PlayerType.Audio)
+                {
+                    mediaPlayer.Play();
+                }
+                else if (playerType == PlayerType.Video)
+                {
+                    videoPlayer.MediaElement.Play();
+                }
+
                 StartPauseButton.Content = "▶";
                 playerStatus = PlayerStatus.Active;
             }
@@ -122,7 +138,15 @@ namespace lab1
         {
             if (playerStatus == PlayerStatus.Active)
             {
-                mediaPlayer.Pause();
+                if (playerType == PlayerType.Audio)
+                {
+                    mediaPlayer.Pause();
+                }
+                else if (playerType == PlayerType.Video)
+                {
+                    videoPlayer.MediaElement.Pause();
+                }
+
                 StartPauseButton.Content = "▶";
                 playerStatus = PlayerStatus.Paused;
             }
@@ -130,15 +154,24 @@ namespace lab1
 
         private void Button_Click_1(object sender, RoutedEventArgs e)
         {
-            if (mediaPlayer == null)
+            if (mediaPlayer == null && videoPlayer == null)
             {
                 return;
             }
 
             if (playerStatus == PlayerStatus.Active || playerStatus == PlayerStatus.Paused)
             {
-                mediaPlayer.Stop();
-                timerAudioPlayback.Stop();
+                if (playerType == PlayerType.Audio)
+                {
+                    mediaPlayer.Stop();
+                }
+                else if (playerType == PlayerType.Video)
+                {
+                    videoPlayer.MediaElement.Stop();
+                    videoPlayer.Close();
+                }
+
+                timerPlayback.Stop();
                 StartPauseButton.Content = "▶";
             }
 
@@ -147,67 +180,125 @@ namespace lab1
 
         private void Button_Click_2(object sender, RoutedEventArgs e)
         {
-            if (currentSongIndex + 1 >= songs.Count)
+            if (currentFileIndex + 1 >= files.Count)
             {
                 Play(0);
             }
             else
             {
-                Play(currentSongIndex + 1);
+                Play(currentFileIndex + 1);
             }
         }
 
-        private void Play(int songIndex)
+        private void Play(int fileIndex)
         {
-            mediaPlayer.Stop();
-            string path = "music\\" + songs[songIndex] + ".mp3";
-            mediaPlayer.Open(new Uri(path, UriKind.Relative));
-            mediaPlayer.Play();
-            playerStatus = PlayerStatus.Active;
+            string fileName = files[fileIndex];
+            string path = "files\\" + files[fileIndex];
 
-            while (!mediaPlayer.NaturalDuration.HasTimeSpan)
+            if (System.IO.Path.GetExtension(fileName) == ".mp3")
             {
-                timerAudioPlayback = new DispatcherTimer();
-                timerAudioPlayback.Interval = TimeSpan.FromMilliseconds(10);
-                timerAudioPlayback.Tick += TimerAudioPlayback_Tick;
-                timerAudioPlayback.Start();
+                if (videoPlayer != null)
+                {
+                    videoPlayer.MediaElement.Stop();
+                    videoPlayer.Close();
+                    videoPlayer = null;
+                }
+
+                mediaPlayer.Stop();
+                mediaPlayer.Open(new Uri(path, UriKind.Relative));
+                mediaPlayer.Play();
+                playerType = PlayerType.Audio;
+
+                while (!mediaPlayer.NaturalDuration.HasTimeSpan)
+                {
+                    CreateAndStartTimer();
+                }
+            }
+            else if (System.IO.Path.GetExtension(fileName) == ".mp4")
+            {
+                if (mediaPlayer != null)
+                {
+                    mediaPlayer.Stop();
+                }
+
+                videoPlayer = new VideoPlayer();
+                videoPlayer.Show();
+                videoPlayer.MediaElement.Source = new Uri(path, UriKind.Relative);
+                videoPlayer.MediaElement.Play();
+                playerType = PlayerType.Video;
+
+                while (!videoPlayer.MediaElement.NaturalDuration.HasTimeSpan)
+                {
+                    CreateAndStartTimer();
+                }
             }
 
-            SongTitle.Text = songs[songIndex];
-            currentSongIndex = songIndex;
+            Title.Text = fileName;
+            currentFileIndex = fileIndex;
+            playerStatus = PlayerStatus.Active;
+        }
+
+        private void CreateAndStartTimer()
+        {
+            timerPlayback = new DispatcherTimer();
+            timerPlayback.Interval = TimeSpan.FromMilliseconds(10);
+            timerPlayback.Tick += TimerPlayback_Tick;
+            timerPlayback.Start();
         }
 
         private void PlayNext()
         {
             if (Repeat.IsChecked.HasValue && Repeat.IsChecked.Value)
             {
-                Play(currentSongIndex);
+                Play(currentFileIndex);
             }
             else
             {
-                if (currentSongIndex + 1 >= songs.Count)
+                if (currentFileIndex + 1 >= files.Count)
                 {
                     Play(0);
                 }
                 else
                 {
-                    Play(currentSongIndex + 1);
+                    Play(currentFileIndex + 1);
                 }
             }
         }
 
-        private void TimerAudioPlayback_Tick(object sender, object e)
+        private void TimerPlayback_Tick(object sender, object e)
         {
-            long currentMediaTicks = mediaPlayer.Position.Ticks;
-            long totalMediaTicks = mediaPlayer.NaturalDuration.TimeSpan.Ticks;
+            long currentMediaTicks = 0;
+            long totalMediaTicks = 0;
+
+            if (playerType == PlayerType.Audio)
+            {
+                currentMediaTicks = mediaPlayer.Position.Ticks;
+                totalMediaTicks = mediaPlayer.NaturalDuration.TimeSpan.Ticks;
+            } 
+            else if (playerType == PlayerType.Video)
+            {
+                if (videoPlayer.MediaElement.NaturalDuration.HasTimeSpan)
+                {
+                    currentMediaTicks = videoPlayer.MediaElement.Position.Ticks;
+                    totalMediaTicks = videoPlayer.MediaElement.NaturalDuration.TimeSpan.Ticks;
+                }
+            }
 
             if (currentMediaTicks == totalMediaTicks)
             {
                 PlayNext();
             }
 
-            CurrentPosition.Text = mediaPlayer.Position.Minutes.ToString("D2") + ":" + mediaPlayer.Position.Seconds.ToString("D2");
-            TotalTime.Text = mediaPlayer.NaturalDuration.TimeSpan.Minutes.ToString("D2") + ":" + mediaPlayer.NaturalDuration.TimeSpan.Seconds.ToString("D2");
+            if (playerType == PlayerType.Audio)
+            {
+                CurrentPosition.Text = mediaPlayer.Position.Minutes.ToString("D2") + ":" + mediaPlayer.Position.Seconds.ToString("D2");
+                TotalTime.Text = mediaPlayer.NaturalDuration.TimeSpan.Minutes.ToString("D2") + ":" + mediaPlayer.NaturalDuration.TimeSpan.Seconds.ToString("D2");
+            }
+            else if (playerType == PlayerType.Video)
+            {
+                CurrentPosition.Text = videoPlayer.MediaElement.Position.Minutes.ToString("D2") + ":" + videoPlayer.MediaElement.Position.Seconds.ToString("D2");
+                TotalTime.Text = videoPlayer.MediaElement.NaturalDuration.TimeSpan.Minutes.ToString("D2") + ":" + videoPlayer.MediaElement.NaturalDuration.TimeSpan.Seconds.ToString("D2");
+            }
 
             if (totalMediaTicks > 0)
             {
@@ -221,10 +312,25 @@ namespace lab1
 
         private void AudioSlider_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         {
-            if (mediaPlayer.NaturalDuration.TimeSpan.Seconds > 0)
+            if (playerType == PlayerType.Audio)
             {
-                mediaPlayer.Position = TimeSpan.FromSeconds(AudioSlider.Value * mediaPlayer.NaturalDuration.TimeSpan.Seconds);
+                if (mediaPlayer.NaturalDuration.TimeSpan.Seconds > 0)
+                {
+                    mediaPlayer.Position = TimeSpan.FromSeconds(AudioSlider.Value * mediaPlayer.NaturalDuration.TimeSpan.Seconds);
+                }
             }
+            else if (playerType == PlayerType.Video)
+            {
+                if (videoPlayer.MediaElement.NaturalDuration.TimeSpan.Seconds > 0)
+                {
+                    videoPlayer.MediaElement.Position = TimeSpan.FromSeconds(AudioSlider.Value * videoPlayer.MediaElement.NaturalDuration.TimeSpan.Seconds);
+                }
+            }
+        }
+
+        private void SongsListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            StartPauseButton.IsEnabled = true;
         }
     }
 }

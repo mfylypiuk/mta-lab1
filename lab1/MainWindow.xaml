@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:lab1"
         mc:Ignorable="d"
-        Title="Music Player" Height="443" Width="223">
+        Title="Audio player" Height="443" Width="255">
     <Grid>
         <Grid Margin="10,10,11,76">
             <Grid.RowDefinitions>
@@ -14,8 +14,8 @@
                 <RowDefinition Height="4*"/>
                 <RowDefinition Height="4*"/>
             </Grid.RowDefinitions>
-            <ListBox x:Name="SongsListBox" Margin="5,5,5,5"/>
-            <TextBlock x:Name="SongTitle" Grid.Row="1" HorizontalAlignment="Center" TextAlignment="Center" Text="song title..." TextWrapping="Wrap" VerticalAlignment="Top" Width="192"/>
+            <ListBox x:Name="SongsListBox" Margin="5,5,5,5" SelectionChanged="SongsListBox_SelectionChanged"/>
+            <TextBlock x:Name="Title" Grid.Row="1" HorizontalAlignment="Center" TextAlignment="Center" Text="file title..." TextWrapping="Wrap" VerticalAlignment="Top" Width="192"/>
             <Grid Grid.Row="3" Margin="0,16,0,-17">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="1*"/>
@@ -34,7 +34,7 @@
             </Grid>
             <Slider x:Name="AudioSlider" HorizontalAlignment="Center" Margin="0,33,0,0" Grid.Row="2" VerticalAlignment="Top" Width="192" MouseLeftButtonUp="AudioSlider_MouseLeftButtonUp"/>
             <TextBlock x:Name="CurrentPosition" HorizontalAlignment="Left" Margin="5,12,0,0" Grid.Row="2" TextWrapping="Wrap" VerticalAlignment="Top"/>
-            <TextBlock x:Name="TotalTime" HorizontalAlignment="Left" Margin="157,12,0,0" Grid.Row="2" TextWrapping="Wrap" VerticalAlignment="Top"/>
+            <TextBlock x:Name="TotalTime" HorizontalAlignment="Left" Margin="191,15,0,0" Grid.Row="2" TextWrapping="Wrap" VerticalAlignment="Top"/>
         </Grid>
     </Grid>
 </Window>
